@@ -218,6 +218,19 @@ folder). Two of its five techniques were live-mapped:
   instead of relying on automatic parenting.
 - `doc.distributeToLayers` exists (`typeof` confirmed "function") but was not exercised live - still an open item.
 
+**Eighth pass (2026-10-23, same day: "try a complete project with what we learned so far") - everything above
+combined into one finished piece, `scripts/project-wave-hello.mjs`.** A 6-part character (correct layer
+separation, skin tone + shirt color + outline), with the RightArm's pivot at its shoulder (`"center left"`
+registration, per the rigging skill) and the Head's pivot at its neck (`"bottom center"`), animated through a
+3-swing wave (eased motion tweens, alternating ease in/out like the ping pong demo) plus a subtle head tilt for
+life, static layers held through the full 3s with `tl.insertKeyframe(lastFrame)` on unchanged content (note:
+`tl.insertFrame` does NOT exist - that was a wrong guess, `insertKeyframe` with the same content achieves the same
+visual persistence). Structure verified with element counts before export (1 element per layer, as it should be)
+rather than trusting the render alone, per the lesson from the sixth pass. Rendered to a real 72-frame, 3s MP4 via
+the established exportPNG+animate_assemble_video pipeline - the arm visibly rotates from the shoulder rather than
+swinging from its own center, confirming the pivot technique holds up in a full multi-part build, not just the
+isolated single-arm test.
+
 **Not attempted yet (next steps, in priority order):**
 1. Crack layer parenting (above) - the real payoff of a rig (pose the parent, children follow) is blocked on this.
 2. `doc.distributeToLayers` - exists, not yet exercised live.

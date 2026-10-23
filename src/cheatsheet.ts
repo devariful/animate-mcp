@@ -19,6 +19,12 @@ Proven JSFL patterns (live-verified, Adobe Animate 2024, Windows):
   exports the WHOLE TIMELINE as a numbered sequence (<basePath-without-.png>0001.png, 0002.png, ...), not just
   doc.currentFrame's single frame as the name might suggest. Use animate_assemble_video (ffmpeg) to turn that
   sequence into a real video file - this is the actual path to a finished clip, not exportVideo (below).
+- Layers for a multi-part character (confirmed working - a 6-layer figure with Head/Torso/LeftArm/RightArm/
+  LeftLeg/RightLeg, each its own layer AND its own symbol, drawn and exported correctly): tl.addNewLayer(name,
+  "normal", false) adds a layer and returns its index; tl.setSelectedLayers(index) makes it the one new shapes draw
+  onto. tl.deleteLayer(0) to remove the default "Layer_1" ONLY WORKS AFTER other layers exist - Animate refuses to
+  delete the last remaining layer in a document, so call it AFTER adding the real layers, not before (confirmed:
+  calling it on a document with only the default layer silently no-ops, no error, layer just stays).
 - Convert a shape to a symbol instance (needed before a classic motion tween): doc.selectAll(); then
   doc.convertToSymbol("graphic", "SomeName", "center") - confirmed working.
 - Classic motion tween (THE core animation primitive, confirmed working and visually verified - a ball smoothly
@@ -43,4 +49,9 @@ Operating model (not optional, found the hard way):
   rather than many small animate_exec calls.
 - fl.quit() does not reliably close the window within a reasonable wait - don't rely on it; the kill-after-run in
   execJsfl() is what actually cleans up.
+- A warm-reuse variant (keep Animate open, close/reopen documents between calls via JSFL instead of restarting the
+  process) was tried and abandoned: the "Open JSFL" dialog's "Don't Show Again" setting doesn't reliably persist,
+  closing+immediately creating a new document threw "Invalid JavaScript object" even with a settle delay, and one
+  attempt crashed Animate outright. Not worth the instability versus a slower but fully reliable cold launch per
+  call. Don't re-attempt this without a genuinely different mechanism (e.g. a persistent CEP/Toolbox extension).
 `;

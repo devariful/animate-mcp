@@ -50,13 +50,19 @@ function killExistingInstances(): void {
 
 // THE CORE FINDING (mapped live, 2026-10-23): Animate.exe only runs a .jsfl file passed on its command line when
 // NO Animate instance is already running. If one is already open, Windows routes the launch to that single
-// instance, which then shows an interactive "Open JSFL File" dialog (Run as command / Open to edit) instead of
-// running anything - silently, with no error, no timeout, just stuck forever waiting for a human click. There is
-// no documented flag to suppress this. The only reliable pattern found: kill every Animate process, THEN launch
-// fresh with the script path. This is how every exec() call behaves - a 10-20s process launch per call, not a
-// warm persistent session like Flow's. (The user can also set "Don't Show Again" + "Run as command" once by hand
-// on that dialog, which would allow reusing a running instance, but relying on an install-specific one-time human
-// setup step is unverifiable on another PC - the kill-then-launch pattern below needs no such setup at all.)
+// instance, which shows an interactive "Open JSFL File" dialog (Run as command / Open to edit) instead of
+// running anything - and even after a human dismisses it with "Don't Show Again", that preference does not
+// reliably persist (it needed re-dismissing multiple times the same session). The only reliable pattern is:
+// kill every Animate process, then launch fresh with the script path.
+//
+// A WARM-REUSE VARIANT WAS TRIED AND ABANDONED (2026-10-23): keeping one Animate instance open across calls
+// (closing/reopening documents via JSFL instead of restarting the process) seemed promising - no window flicker,
+// much faster per call when it worked - but repeatedly hit "Invalid JavaScript object" errors when a new document
+// was created shortly after closing old ones (tried both immediately and with an 800ms busy-wait settle delay),
+// and on one attempt crashed Adobe Animate outright (its own native crash-report dialog, not a JSFL error). That
+// instability is a worse tradeoff than a slower, fully reliable cold launch per call - reverted. If this is
+// revisited, the real fix is probably Animate's Toolbox/CEP persistent-extension architecture instead of fighting
+// JSFL's single-instance command-line routing, not another variation on open/close timing.
 export async function execJsfl(body: string, timeoutMs = 90_000): Promise<string> {
   mkdirSync(WORK_DIR, { recursive: true });
   const id = randomUUID().slice(0, 8);

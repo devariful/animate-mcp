@@ -7,8 +7,9 @@ it's unrelated in purpose: both exist to produce animated video, Flow via AI gen
 free local rendering once Adobe Animate is installed and licensed.
 
 - `src/animate.ts` the driver (find Animate, kill-then-launch pattern, JSFL exec wrapper, URI helpers)
+- `src/assemble.ts` turns an exported PNG frame sequence into an MP4 via ffmpeg
 - `src/cheatsheet.ts` growing catalogue of live-verified JSFL API patterns, returned by `animate_status`
-- `src/index.ts` the two MCP tools
+- `src/index.ts` the three MCP tools (`animate_status`, `animate_exec`, `animate_assemble_video`)
 
 ## Rules
 
@@ -78,16 +79,46 @@ commands over time in flow-mcp rather than needing a dedicated tool per ffmpeg f
   selection/fill object shape is different from what was assumed, or color needs to be set via `doc.fillColor`
   *before* drawing rather than after.
 
+**Also verified live, working (2026-10-23, third pass - multi-part character setup):**
+- A 6-layer character (Head, Torso, LeftArm, RightArm, LeftLeg, RightLeg), each its own named layer AND its own
+  named symbol, drawn correctly and exported as one clean figure - visually verified. `tl.addNewLayer(name,
+  "normal", false)` + `tl.setSelectedLayers(index)` to target it before drawing. **Gotcha**: `tl.deleteLayer(0)`
+  to remove the default "Layer_1" only works once OTHER layers already exist - Animate refuses to delete a
+  document's last remaining layer and silently no-ops (no error) if you try before adding the real ones.
+- This is the real prep step toward actual rigging (Asset Warp/bone tool - NOT yet mapped) or at minimum
+  independent per-part animation: separate layers/symbols mean each body part CAN be keyframed/tweened on its own,
+  unlike the single-symbol ball demo.
+
+**Tried and abandoned (2026-10-23): keeping Animate open across calls instead of killing it between each one.**
+Worth recording in detail since it cost real time and very nearly looked like it was working:
+- The "Open JSFL File" dialog's "Don't Show Again" checkbox does NOT reliably persist - it had to be re-dismissed
+  by hand multiple times in the same session, for reasons not fully understood (possibly tied to Animate's
+  preferences only saving on a clean quit, which a forced `taskkill` never gives it).
+- Even when the dialog wasn't the problem, closing all open documents and immediately creating a new one in the
+  same script threw `Invalid JavaScript object. The original object may have been deleted or the document may
+  have been closed.` - tried both with no delay and with an 800ms busy-wait settle (JSFL has no native sleep).
+  Moving the cleanup to the END of each script (closing documents after the body's work was done, instead of at
+  the start of the next one) didn't fix it either.
+- On one attempt, Animate crashed outright - its own native "Sorry, an error occurred" crash-report dialog, not a
+  JSFL-level error at all.
+- **Verdict: reverted to kill-before-every-call.** It's slower (a full ~20-30s app relaunch per `animate_exec`
+  call) but has been completely reliable across this entire project so far, while the warm-reuse path produced a
+  real application crash within the same session it was tried. If this is revisited, it probably needs Animate's
+  CEP/Toolbox persistent-extension architecture rather than more tuning of JSFL open/close timing.
+
 **Not attempted yet (next steps, in priority order):**
 1. Fill/stroke color control - needed for anything beyond default-blue shapes.
 2. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
    primitive shapes drawn via JSFL - this is the real path to animating an actual character, not a ball.
-3. Shape tweens (morphing) as a second animation primitive, for effects a motion tween on a symbol can't do.
-4. Easing control on tweens (currently linear/default only) and multi-layer scenes (background + character as
-   separate layers).
-5. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
+3. The Asset Warp Tool / bone-based rigging JSFL API - independent limb movement (an arm bending at the elbow),
+   as opposed to the whole-symbol position/scale tweening built so far. This is what "rigging" actually means and
+   hasn't been touched yet; the multi-layer character above is the prep step for it, not the rigging itself.
+4. Shape tweens (morphing) as a second animation primitive, for effects a motion tween on a symbol can't do.
+5. Easing control on tweens (currently linear/default only).
+6. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
    the real deliverable for this project's purposes).
 
-Smoke-tested end to end through the actual compiled MCP server (not ad hoc scripts) twice: `scripts/test.mjs`
-(shape + PNG export) and `scripts/test-full-pipeline.mjs` (full exec -> exportPNG -> animate_assemble_video ->
-playable MP4, watched and confirmed correct).
+Smoke-tested end to end through the actual compiled MCP server (not ad hoc scripts) three times: `scripts/test.mjs`
+(shape + PNG export), `scripts/test-full-pipeline.mjs` (full exec -> exportPNG -> animate_assemble_video ->
+playable MP4, watched and confirmed correct), and `scripts/test-character-parts.mjs` (6-part character, separate
+named layers and symbols, visually verified).

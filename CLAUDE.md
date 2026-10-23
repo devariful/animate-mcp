@@ -56,26 +56,38 @@ commands over time in flow-mcp rather than needing a dedicated tool per ffmpeg f
   silently (no visible console, no exit code signal) and a script that never finishes looks identical to one still
   running.
 
+**Also verified live, working (2026-10-23, second pass):**
+- Classic motion tween: shape -> `convertToSymbol` -> move/scale the instance at a later keyframe -> set
+  `tweenType = "motion"` on the span's first frame. Visually verified with 3 sample frames (start/middle/end) that
+  Animate genuinely interpolates position AND scale smoothly - this is real animation, not a guess.
+- `exportPNG(basePath, ...)` exports the ENTIRE TIMELINE as a numbered PNG sequence (`<base>0001.png`, `0002.png`,
+  ...), regardless of `doc.currentFrame` - this was a wrong assumption in the first pass (thought it exported only
+  the current frame). This is actually more useful: one call gets every frame.
+- `doc.exportVideo(...)` exists but does not reliably produce a file - looks like an async hand-off (likely Adobe
+  Media Encoder) that doesn't complete before `execJsfl` kills Animate. **Not the way to get video.**
+- New tool `animate_assemble_video`: takes the PNG sequence from `exportPNG` and turns it into a real MP4 via
+  ffmpeg - the same technique flow-mcp's `assemble.ts` already uses. This is the actual, confirmed path to a
+  finished animated clip. End-to-end pipeline (exec -> exportPNG sequence -> assemble -> playable MP4) verified by
+  producing and watching a real 36-frame clip of a ball moving and scaling up.
+
 **Found but NOT working / not yet resolved:**
 - `fl.saveDocumentAs(doc, uri)` returns `true` but the `.fla` was not found on disk afterwards in testing. Don't
-  rely on persisting an editable `.fla` yet - `exportPNG` (and presumably `exportMovie`, untested) are the
-  confirmed-reliable output paths. Re-test this before building anything that depends on saved project files.
+  rely on persisting an editable `.fla` yet - the exportPNG-sequence path above is the confirmed-reliable output.
 - Setting a shape's fill color after drawing (via `doc.setSelectionRect` + `selection[i].fill.color`) did not
   visibly change the export (came out Animate's default blue both times). Needs remapping - possibly the
   selection/fill object shape is different from what was assumed, or color needs to be set via `doc.fillColor`
   *before* drawing rather than after.
 
-**Not attempted yet (the actual next steps toward real animation, in priority order):**
-1. Motion/shape tweening between two keyframes - the core "animation" primitive. Nothing works until this is mapped.
-2. `doc.exportMovie()` or equivalent - rendering the full timeline to a video file (MP4/SWF/image sequence), the
-   actual deliverable format. `exportPNG` only gets one static frame.
-3. Re-test `fl.saveDocumentAs` and fill-color setting (above).
-4. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
-   primitive shapes drawn via JSFL.
-5. A real "assemble a short animation" tool once 1-2 are solid - almost certainly keyframe stills exported via
-   `exportPNG` per frame + ffmpeg assembly (the same technique already proven in flow-mcp's `assemble.ts`), unless
-   `exportMovie` turns out to handle it directly.
+**Not attempted yet (next steps, in priority order):**
+1. Fill/stroke color control - needed for anything beyond default-blue shapes.
+2. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
+   primitive shapes drawn via JSFL - this is the real path to animating an actual character, not a ball.
+3. Shape tweens (morphing) as a second animation primitive, for effects a motion tween on a symbol can't do.
+4. Easing control on tweens (currently linear/default only) and multi-layer scenes (background + character as
+   separate layers).
+5. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
+   the real deliverable for this project's purposes).
 
-Smoke-tested end to end through the actual compiled MCP server (not just ad hoc scripts) via `scripts/test.mjs`:
-`animate_status` found the real install and returned the cheatsheet; `animate_exec` drew a rounded rectangle and
-exported it, verified by viewing the resulting PNG.
+Smoke-tested end to end through the actual compiled MCP server (not ad hoc scripts) twice: `scripts/test.mjs`
+(shape + PNG export) and `scripts/test-full-pipeline.mjs` (full exec -> exportPNG -> animate_assemble_video ->
+playable MP4, watched and confirmed correct).

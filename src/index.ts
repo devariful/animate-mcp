@@ -3,6 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { execJsfl, findAnimate, projectDir, toJsflUri } from "./animate.js";
+import { assembleSequence } from "./assemble.js";
 import { CHEATSHEET } from "./cheatsheet.js";
 
 const server = new McpServer({ name: "animate-mcp", version: "0.1.0" });
@@ -56,6 +57,30 @@ server.registerTool(
         const body = `var OUTPUT_DIR = "${outputDirUri}";\n${script}`;
         const log = await execJsfl(body, timeout_seconds * 1000);
         return { output_dir: dir, log };
+      })(),
+    ),
+);
+
+server.registerTool(
+  "animate_assemble_video",
+  {
+    title: "Assemble an exported PNG frame sequence into a video",
+    description:
+      "Turns a PNG frame sequence (as produced by doc.exportPNG(OUTPUT_DIR + '/<name>.png', ...) inside animate_exec - which exports the WHOLE timeline as <name>0001.png, <name>0002.png, ... not just one frame) into a real MP4 with ffmpeg. Animate's own exportVideo() does not reliably produce a file in this setup, so this is the real path to a finished video.",
+    inputSchema: {
+      project: z.string().min(1).describe("Same project folder name used in the animate_exec call that produced the frames."),
+      base_name: z.string().min(1).describe("The <name> used in exportPNG(OUTPUT_DIR + '/<name>.png', ...), without the frame numbers or extension, e.g. 'anim' for anim0001.png etc."),
+      fps: z.number().min(1).max(60).default(24).describe("Animate's default document frame rate is 24fps - match whatever the document was actually set to, or the motion will play at the wrong speed."),
+      output_name: z.string().default("final").describe("Output filename (without needing .mp4, it's added automatically)."),
+    },
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true },
+  },
+  ({ project, base_name, fps, output_name }) =>
+    reply(
+      (async () => {
+        const dir = projectDir(project);
+        const output = await assembleSequence(dir, base_name, fps, output_name);
+        return { output };
       })(),
     ),
 );

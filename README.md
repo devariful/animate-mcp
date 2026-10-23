@@ -24,11 +24,15 @@ default install locations checked in `src/animate.ts`, set `ANIMATE_MCP_EXE` to 
 - `animate_exec` — runs a JSFL script body in a fresh Animate instance and returns whatever it logged. This is a
   code-execution tool (like running Python or shell), not a fixed menu of animation operations — write real JSFL
   against Animate's own object model (`fl`, `document`, `Timeline`, ...).
+- `animate_assemble_video` — turns the PNG frame sequence `animate_exec`/`exportPNG` produces into a real MP4
+  via ffmpeg (Animate's own `exportVideo` doesn't reliably produce a file in this setup).
 
 See `CLAUDE.md` for what's been verified to actually work, what hasn't, and what's next.
 
 ## Status
 
-Early stage — document creation, shape drawing, and single-frame PNG export are confirmed working. Tweening/motion
-and full video export are the next things being mapped. See `CLAUDE.md` for the detailed, dated log of what's
-been tested live against the real application.
+Working end to end: document/shape creation, converting a shape to a symbol, classic motion tweens (position +
+scale, smoothly interpolated, visually verified), exporting the full timeline as a PNG sequence, and assembling
+that into a playable MP4. Not yet solved: fill/stroke color control, importing external artwork to animate instead
+of primitive shapes, and saving an editable `.fla`. See `CLAUDE.md` for the detailed, dated log of what's been
+tested live against the real application.

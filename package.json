@@ -1,0 +1,22 @@
+{
+  "name": "animate-mcp",
+  "version": "0.1.0",
+  "description": "Local MCP server that drives Adobe Animate (JSFL) to create and render 2D animation",
+  "main": "dist/index.js",
+  "type": "module",
+  "bin": {
+    "animate-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "typescript": "^7.0.2"
+  }
+}

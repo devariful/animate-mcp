@@ -89,8 +89,8 @@ commands over time in flow-mcp rather than needing a dedicated tool per ffmpeg f
   independent per-part animation: separate layers/symbols mean each body part CAN be keyframed/tweened on its own,
   unlike the single-symbol ball demo.
 
-**Tried and abandoned (2026-10-23): keeping Animate open across calls instead of killing it between each one.**
-Worth recording in detail since it cost real time and very nearly looked like it was working:
+**First warm-reuse attempt (2026-10-23): CLOSE-and-recreate - tried and abandoned.** Worth recording in detail
+since it cost real time and very nearly looked like it was working:
 - The "Open JSFL File" dialog's "Don't Show Again" checkbox does NOT reliably persist - it had to be re-dismissed
   by hand multiple times in the same session, for reasons not fully understood (possibly tied to Animate's
   preferences only saving on a clean quit, which a forced `taskkill` never gives it).
@@ -101,10 +101,23 @@ Worth recording in detail since it cost real time and very nearly looked like it
   the start of the next one) didn't fix it either.
 - On one attempt, Animate crashed outright - its own native "Sorry, an error occurred" crash-report dialog, not a
   JSFL-level error at all.
-- **Verdict: reverted to kill-before-every-call.** It's slower (a full ~20-30s app relaunch per `animate_exec`
-  call) but has been completely reliable across this entire project so far, while the warm-reuse path produced a
-  real application crash within the same session it was tried. If this is revisited, it probably needs Animate's
-  CEP/Toolbox persistent-extension architecture rather than more tuning of JSFL open/close timing.
+- Reverted to kill-before-every-call as a result.
+
+**Second warm-reuse attempt (2026-10-23, same day, the user's own correction): NEVER close anything - verified
+working, this is now the default.** The crash above came specifically from the close-then-immediately-recreate
+sequence; the fix was to stop doing that entirely rather than to tune its timing further:
+- `execJsfl` no longer kills Animate automatically at all (before OR after a run) - only `animate_reset` does,
+  and only when explicitly called. Every wrapped script gets a `getDoc()` helper: returns `fl.getDocumentDOM()` if
+  a document is already open, or `fl.createDocument("timeline")` only if none exists. Scripts call `getDoc()`
+  instead of `fl.createDocument()` directly to continue the same project across calls.
+- Stress-tested with 7 consecutive `animate_exec` calls building up the same document (a circle, a rectangle, then
+  5 more circles added one call at a time) - zero errors, zero crashes, and all 7 shapes present together in the
+  final export, visually confirmed. The first call is a normal ~30s cold launch; every call after that against the
+  already-open instance took 1-3s, far faster than a kill+relaunch cycle.
+- If `animate_exec` times out while Animate was already running, that's surfaced as "likely the dialog is stuck
+  on screen, go dismiss it" rather than auto-killing - auto-killing was exactly what broke the dialog preference
+  in the first attempt, so recovering from a stuck dialog by killing was fighting against the very feature this
+  was built for.
 
 **Also verified live, working (2026-10-23, fourth pass - animation principles applied to the ping pong demo):**
 - `tweenEasing` (-100..100 on a classic tween's starting frame) confirmed working: positive for decelerating

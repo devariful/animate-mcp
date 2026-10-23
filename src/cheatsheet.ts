@@ -50,6 +50,14 @@ Proven JSFL patterns (live-verified, Adobe Animate 2024, Windows):
 - URIs: Windows paths need the JSFL drive-letter-pipe form: file:///C|/Users/... (not file:///C:/...). Use
   toJsflUri() from animate.ts rather than hand-building these.
 
+Continuity across calls (2026-10-23, verified with 7 consecutive calls building one document): animate_exec no
+longer kills or closes anything automatically. Start every script with var doc = getDoc(); instead of
+fl.createDocument(...) - it returns the already-open document if one exists, or creates one only if none does.
+This lets a whole sequence of animate_exec calls keep building the same project (first call ~30s cold launch,
+every call after that against the already-open instance ~1-3s). Call fl.createDocument() directly only if you
+deliberately want to abandon whatever's open and start a new project; call the separate animate_reset tool only
+if Animate needs a genuine force-restart (it's not automatic any more - see its own description for why).
+
 Operating model (not optional, found the hard way):
 - Animate.exe only runs a .jsfl passed as an argument when NO Animate instance is already running. If one is
   already open, the launch gets routed to it and shows an interactive "Open JSFL File" dialog (Run as command /

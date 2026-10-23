@@ -48,21 +48,30 @@ function killExistingInstances(): void {
   }
 }
 
+function isAnimateRunning(): boolean {
+  try {
+    const out = execSync('tasklist /FI "IMAGENAME eq Animate.exe"', { encoding: "utf8" });
+    return /Animate\.exe/i.test(out);
+  } catch {
+    return false;
+  }
+}
+
 // THE CORE FINDING (mapped live, 2026-10-23): Animate.exe only runs a .jsfl file passed on its command line when
 // NO Animate instance is already running. If one is already open, Windows routes the launch to that single
-// instance, which shows an interactive "Open JSFL File" dialog (Run as command / Open to edit) instead of
-// running anything - and even after a human dismisses it with "Don't Show Again", that preference does not
-// reliably persist (it needed re-dismissing multiple times the same session). The only reliable pattern is:
-// kill every Animate process, then launch fresh with the script path.
+// instance, which (on some PCs, some of the time) shows an interactive "Open JSFL File" dialog (Run as command /
+// Open to edit) instead of running anything - a human has had to dismiss it more than once in testing, so "Don't
+// Show Again" does not reliably stick.
 //
-// A WARM-REUSE VARIANT WAS TRIED AND ABANDONED (2026-10-23): keeping one Animate instance open across calls
-// (closing/reopening documents via JSFL instead of restarting the process) seemed promising - no window flicker,
-// much faster per call when it worked - but repeatedly hit "Invalid JavaScript object" errors when a new document
-// was created shortly after closing old ones (tried both immediately and with an 800ms busy-wait settle delay),
-// and on one attempt crashed Adobe Animate outright (its own native crash-report dialog, not a JSFL error). That
-// instability is a worse tradeoff than a slower, fully reliable cold launch per call - reverted. If this is
-// revisited, the real fix is probably Animate's Toolbox/CEP persistent-extension architecture instead of fighting
-// JSFL's single-instance command-line routing, not another variation on open/close timing.
+// A CLOSE-AND-RECREATE warm-reuse variant was tried and abandoned the same day: closing all documents and
+// immediately creating a new one threw "Invalid JavaScript object" and once crashed Animate outright. THIS IS
+// DIFFERENT AND DELIBERATELY SAFER (the user's own correction, 2026-10-23): never close or recreate anything.
+// Keep Animate open, keep whatever document is already open open, and just keep running more JSFL against it -
+// getDoc() in every wrapped script returns the current document if one exists rather than creating a fresh one.
+// If Animate is already running, this does NOT kill it to force a cold launch any more: killing is what destroys
+// the "Don't Show Again" dialog preference in the first place, so recovering from a stuck dialog by killing was
+// working against the very feature being asked for. Instead, a stuck warm dispatch surfaces a clear error asking
+// a human to click the dialog - the process is left alone either way.
 export async function execJsfl(body: string, timeoutMs = 90_000): Promise<string> {
   mkdirSync(WORK_DIR, { recursive: true });
   const id = randomUUID().slice(0, 8);
@@ -76,10 +85,13 @@ export async function execJsfl(body: string, timeoutMs = 90_000): Promise<string
   // JSFL has no stack unwinding protection of its own, and a script that dies silently (no window, no console a
   // human can see) is undebuggable without this. The .done sentinel is written in a `finally`-equivalent (both the
   // success path and the catch path reach it) so the host can tell "finished" apart from "Animate is still busy or
-  // stuck on a dialog" instead of guessing from a fixed delay.
+  // stuck on a dialog" instead of guessing from a fixed delay. getDoc() is the new continuity primitive: scripts
+  // should call it instead of fl.createDocument() directly, so a whole session of animate_exec calls keeps
+  // building on the SAME project instead of each one starting a fresh document.
   const wrapped = `
 var __log = [];
 function log(msg) { __log.push(String(msg)); FLfile.write("${logUri}", __log.join("\\n")); }
+function getDoc() { return fl.documents.length > 0 ? fl.getDocumentDOM() : fl.createDocument("timeline"); }
 function __finish() { FLfile.write("${logUri}", __log.join("\\n")); FLfile.write("${doneUri}", "done"); }
 try {
 ${body}
@@ -93,12 +105,9 @@ ${body}
   rmSync(logPath, { force: true });
   rmSync(donePath, { force: true });
 
-  killExistingInstances();
-  await sleep(1500);
-
   const exe = findAnimate();
-  const child = spawn(exe, [scriptPath], { detached: true, stdio: "ignore" });
-  child.unref();
+  const wasRunning = isAnimateRunning();
+  spawn(exe, [scriptPath], { detached: true, stdio: "ignore" }).unref();
 
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -107,16 +116,26 @@ ${body}
   }
   const finished = existsSync(donePath);
   const log = existsSync(logPath) ? readFileSync(logPath, "utf8") : "";
-  killExistingInstances();
 
   if (!finished) {
     throw new Error(
-      `Animate did not finish within ${Math.round(timeoutMs / 1000)}s (killed it just now). ` +
-        `This usually means an unexpected dialog appeared (a save prompt, a compatibility warning) that no one was there to click. ` +
-        `Partial log:\n${log || "(nothing was logged before it got stuck)"}`,
+      wasRunning
+        ? `Animate didn't finish within ${Math.round(timeoutMs / 1000)}s, and it was already running, so this is almost certainly ` +
+          `the "Open JSFL File" dialog sitting on screen waiting for a click (Run as command + Don't Show Again). ` +
+          `Animate was left running, nothing was killed - check the screen, dismiss it, and retry. ` +
+          `Partial log:\n${log || "(nothing was logged before it got stuck)"}`
+        : `Animate did not finish within ${Math.round(timeoutMs / 1000)}s on a fresh launch - this is unusual since no dialog ` +
+          `should be possible here. Check the screen for an unexpected prompt (crash recovery, a compatibility warning). ` +
+          `Partial log:\n${log || "(nothing was logged before it got stuck)"}`,
     );
   }
   return log;
+}
+
+// Explicit, user-requested reset - NOT called automatically any more (see execJsfl's comment: auto-killing to
+// recover from a stuck dialog was destroying the very "Don't Show Again" preference that avoids the dialog).
+export function resetAnimate(): void {
+  killExistingInstances();
 }
 
 function sleep(ms: number): Promise<void> {

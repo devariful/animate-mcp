@@ -2,7 +2,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { execJsfl, findAnimate, projectDir, toJsflUri } from "./animate.js";
+import { execJsfl, findAnimate, projectDir, resetAnimate, toJsflUri } from "./animate.js";
 import { assembleSequence } from "./assemble.js";
 import { CHEATSHEET } from "./cheatsheet.js";
 
@@ -41,10 +41,10 @@ server.registerTool(
   {
     title: "Run JSFL in Adobe Animate",
     description:
-      "Runs a JSFL script body in a fresh Adobe Animate instance (it kills any already-running Animate first - that's required, not optional, see animate_status's cheatsheet) and returns whatever the script logged via the injected log(msg) function. Write real JSFL against the `fl` and `doc`/`document` objects - this is a code-execution tool, not a fixed menu of operations. A variable OUTPUT_DIR (a JSFL file:/// URI) is injected for the project's output folder - use it for exportPNG/exportMovie/saveDocumentAs paths rather than hard-coding a path. Each call launches the full Animate GUI process and takes 15-30s minimum; it is not a warm session, so batch multiple operations into one script rather than calling this many times in a row where possible.",
+      "Runs a JSFL script body in Adobe Animate and returns whatever the script logged via the injected log(msg) function. Write real JSFL against the `fl` object - this is a code-execution tool, not a fixed menu of operations. KEEPS Animate open across calls rather than restarting it each time: call getDoc() instead of fl.createDocument() to continue working on whatever's already open (it creates a document only if none exists yet), so a whole sequence of animate_exec calls can build up the same project. Call fl.createDocument() directly only when you deliberately want to abandon what's open and start fresh. A variable OUTPUT_DIR (a JSFL file:/// URI) is injected for the project's output folder - use it for exportPNG/saveDocumentAs paths. If Animate was already open and this times out, it's almost certainly the 'Open JSFL File' dialog waiting for a human click on screen (Run as command + Don't Show Again) - Animate is left running either way, nothing gets killed automatically; use animate_reset only if you actually want to force-restart it.",
     inputSchema: {
       project: z.string().min(1).describe("Folder name under the output root for this project's files."),
-      script: z.string().min(1).describe("JSFL script body (not a whole file - no need to wrap in try/catch, that's handled for you). Call log('...') to report progress/results; always log() something meaningful, since that's the only way to tell what happened."),
+      script: z.string().min(1).describe("JSFL script body (not a whole file - no need to wrap in try/catch, that's handled for you). Start with getDoc() to get/create the working document. Call log('...') to report progress/results; always log() something meaningful, since that's the only way to tell what happened."),
       timeout_seconds: z.number().int().min(10).max(600).default(90),
     },
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false },
@@ -83,6 +83,18 @@ server.registerTool(
         return { output };
       })(),
     ),
+);
+
+server.registerTool(
+  "animate_reset",
+  {
+    title: "Force-restart Adobe Animate",
+    description:
+      "Force-closes Adobe Animate (losing any unsaved work in whatever's currently open) so the next animate_exec starts a genuinely fresh instance. Not called automatically any more - only use this when Animate is actually stuck (e.g. a dialog that won't go away) or the user explicitly wants a clean slate, since killing it is also what resets the 'Open JSFL File' dialog's Don't-Show-Again preference.",
+    inputSchema: {},
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+  },
+  () => reply((async () => { resetAnimate(); return { reset: true }; })()),
 );
 
 await server.connect(new StdioServerTransport());

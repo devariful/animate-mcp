@@ -195,18 +195,42 @@ full before touching multi-part layer code again:
   counts (or an equivalent structural check), not just an exported image. A correct-looking render proves nothing
   about internal structure once symbols and multiple layers are involved.
 
+**Seventh pass (2026-10-23, same day: the user supplied a production rigging blueprint document - "cut-out puppet"
+character design - and asked to add it as a Claude skill AND actually try the lesson live.** Added as
+`~/.claude/skills/adobe-animate-rigging/SKILL.md` (not part of this repo, lives in the user's Claude skills
+folder). Two of its five techniques were live-mapped:
+- **Pivot points at joints - CONFIRMED, this is the one that actually matters for natural limb movement.** The
+  obvious-seeming approach (set `instance.transformX`/`transformY` after converting to a symbol) is WRONG - those
+  are aliases for `x`/`y` and setting them just moves the whole instance, visibly jumping it off its drawn
+  position. The real technique: pick the registration point AT CONVERSION TIME via `convertToSymbol`'s third
+  argument, which takes the same 9-point grid as the GUI's Convert to Symbol dialog ("center left", "top center",
+  etc). `convertToSymbol("graphic", "Arm", "center left")` on a horizontal arm shape puts the pivot exactly at its
+  left edge - confirmed with an actual 45-degree rotation test (shoulder end stayed fixed, hand end swung
+  naturally). See `scripts/pivot-joint-rotation.mjs`.
+- **Layer parenting - tried honestly, NOT cracked.** `layer.parentLayer` is a real property (confirmed via
+  `for...in`) that type-checks its input (a layer index or name both throw `Invalid value for property
+  parentLayer` immediately) but silently refuses an actual Layer object reference too - no error, reads back as
+  `null` right after assignment. Guessed `layerType` values that might unlock parenting ("armature", "parented")
+  both threw `Invalid value for property layerType`. Not solved this session - documented in the skill and here so
+  it isn't re-attempted blind. Likely next step if picked up again: check whether the GUI's "Enable Classic Layer
+  Parenting" is a document/Timeline-level flag that has to be set before the per-layer property does anything.
+  Until solved, pose a rig by directly keyframing/tweening each child's position+rotation to match its parent's
+  instead of relying on automatic parenting.
+- `doc.distributeToLayers` exists (`typeof` confirmed "function") but was not exercised live - still an open item.
+
 **Not attempted yet (next steps, in priority order):**
-1. The `fl.tools` hang (above) - worth understanding before it's needed for something, rather than after.
-2. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
+1. Crack layer parenting (above) - the real payoff of a rig (pose the parent, children follow) is blocked on this.
+2. `doc.distributeToLayers` - exists, not yet exercised live.
+3. The `fl.tools` hang (above) - worth understanding before it's needed for something, rather than after.
+4. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
    primitive shapes drawn via JSFL - this is the real path to animating an actual character, not a ball.
-3. The Asset Warp Tool / bone-based rigging JSFL API - independent limb movement (an arm bending at the elbow),
-   as opposed to the whole-symbol position/scale tweening built so far. This is what "rigging" actually means and
-   hasn't been touched yet; the multi-layer character above is the prep step for it, not the rigging itself.
-4. Shape tweens (morphing) as a second animation primitive, for effects a motion tween on a symbol can't do.
-5. Other animation principles worth mapping onto JSFL as real needs come up: Arcs (the bounce demo already has
+5. The Asset Warp Tool / bone-based rigging JSFL API - an alternative to layer parenting for independent limb
+   movement, if parenting stays uncracked. Not attempted yet.
+6. Shape tweens (morphing) as a second animation primitive, for effects a motion tween on a symbol can't do.
+7. Other animation principles worth mapping onto JSFL as real needs come up: Arcs (the bounce demo already has
    this via its keyframe path), Anticipation, Follow Through/Overlapping Action (would matter once there are
    multi-part characters with independent timing per part), Secondary Action.
-6. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
+8. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
    the real deliverable for this project's purposes).
 
 Smoke-tested end to end through the actual compiled MCP server (not ad hoc scripts) repeatedly, notably:

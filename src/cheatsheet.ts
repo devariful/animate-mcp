@@ -67,6 +67,23 @@ Proven JSFL patterns (live-verified, Adobe Animate 2024, Windows):
   selected shape is confirmed reliable (full property readback matched: style, thickness, color, capType, joinType
   etc. all as set). doc.setStrokeColor(color) was not separately stress-tested but given the fill-color finding
   above, treat it with the same suspicion and prefer setCustomStroke after drawing.
+- PIVOT POINTS FOR NATURAL JOINT ROTATION (confirmed working, 2026-10-23 - see the adobe-animate-rigging skill for
+  the full rigging context this came from): instance.transformX/transformY are just aliases for x/y (the
+  instance's STAGE position) - setting them MOVES the whole instance rather than repositioning its pivot, which is
+  NOT what you want for a joint. The real technique is choosing the registration point AT CONVERSION TIME via
+  convertToSymbol's third argument, which takes a 9-point grid ("top left", "center left", "center", "bottom
+  right", etc. - same grid as the Convert to Symbol dialog). For a horizontal arm whose shoulder is at its own
+  left edge, convertToSymbol("graphic", "Arm", "center left") puts the pivot exactly there - confirmed with a real
+  45-degree rotation: the shoulder end stayed fixed, the hand end swung naturally around it.
+- LAYER PARENTING (tried, NOT cracked - documented so it isn't re-attempted blind): layer.parentLayer is a real
+  property (shows up in a for...in enumeration) that DOES type-check - assigning a layer index (number) or name
+  (string) both throw "Invalid value for property parentLayer" immediately. Assigning an actual Layer object
+  reference does not throw but reads back as null right after - silently doesn't take. layerType also rejects
+  guessed parenting-related values ("armature", "parented") with "Invalid value for property layerType", only
+  standard types work. If revisited: check whether Animate's GUI "Enable Classic Layer Parenting" is a
+  document/Timeline-level flag that needs flipping first, since the per-layer property alone doesn't seem
+  sufficient. Until solved, pose rigs by directly keyframing/tweening each child's position+rotation to match its
+  parent's, rather than relying on automatic parenting.
 - Squash and stretch (animation principle #1, verified working): set a symbol instance's scaleX/scaleY at a
   keyframe just like x/y - e.g. scaleX=1.3, scaleY=0.65 at a "ground contact" keyframe for a squashed pose, back
   to scaleX=1/scaleY=1 at the next keyframe for round/normal. Animate tweens scale smoothly along with position.

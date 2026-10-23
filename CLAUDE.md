@@ -144,9 +144,10 @@ strokes, learned together live): fill/stroke color control is SOLVED, with a rea
   needed to apply correctly in the same script, which `setFillColor` could not do correctly but `setCustomFill`
   did. `doc.setCustomStroke({style:"solid", thickness:N, color:"#RRGGBB"})` works the same reliable way for
   outlines - full property readback matched exactly what was set.
-- A real character was built and visually verified with this: 6 named layers/symbols (Head, Torso, LeftArm,
-  RightArm, LeftLeg, RightLeg), skin-tone fill on the body parts, a different color on the torso (a shirt), and a
-  consistent dark brush-like outline stroke on every part - see `scripts/character-skintone.mjs`.
+- A character was built and the exported PNG looked completely correct: 6 parts, skin-tone fill on the body, a
+  different color on the torso (a shirt), consistent dark outline. **This looked done, but the layer structure
+  underneath it was actually broken - see the sixth pass below.** The visual-only check here was not enough;
+  don't trust "the exported image looks right" as proof that a multi-part document's internal structure is right.
 - Separately, probing `fl.tools` (looking for brush-tool/preset selection, since the user asked about using a
   specific "Brush Stroke 2" preset) caused `animate_exec` to hang indefinitely mid-script - not a stuck dialog,
   Animate's own window stayed responsive throughout, but the script itself never reached its `log()` calls for
@@ -157,6 +158,42 @@ strokes, learned together live): fill/stroke color control is SOLVED, with a rea
   all came back `undefined`.
 - Also newly confirmed: JSFL has no native `JSON` object (`JSON.stringify` throws `ReferenceError`) - it's an old
   engine. Don't reach for JSON in a JSFL body; build result strings manually if structure is needed in a log.
+
+**Sixth pass (2026-10-23, same day: the user directly inspected the actual Animate timeline and reported "everything
+drawn in the top layer, though all layers created separately, but other layers are empty" - they were right, and the
+visual PNG check above had completely missed it.** This took real back-and-forth to pin down and is worth reading in
+full before touching multi-part layer code again:
+- First suspicion (wrong): `tl.setSelectedLayers(index)` doesn't actually redirect drawing. Testing proved this
+  PARTIALLY true - in isolation (two shapes, no symbol conversion in between) it worked fine; it only broke after a
+  `convertToSymbol()` call had happened earlier in the script. Neither `doc.exitEditMode()` nor re-fetching
+  `doc`/`tl` fresh via `fl.getDocumentDOM()` fixed it. The reliable fix that DID work: set `tl.currentLayer = index`
+  as a direct property assignment instead of calling `setSelectedLayers()`.
+- Verifying this fix exposed a second, bigger problem: `layer.visible = false` then `doc.exportPNG()` does NOT
+  reliably hide that layer's content in the render for layers holding symbol instances - toggling visibility and
+  exporting produced either a totally blank image or the full untouched composite, never a correctly isolated
+  single part. This made it LOOK like the currentLayer fix hadn't worked. Switched to a trustworthy check instead:
+  `tl.layers[i].frames[0].elements.length` and `.elements[j].libraryItem.name` - this had been accurate throughout
+  the whole investigation (it's what first proved the bug was real, back when it correctly reported 0 elements on
+  an empty-looking layer).
+- With that reliable check, the REAL root cause turned out to be different from both of the above: the character
+  script called `doc.selectAll()` before every `convertToSymbol()`. `selectAll()` selects everything on the entire
+  stage across all layers (same as Edit > Select All in the GUI) - not just the shape just drawn. So each new part's
+  conversion re-selected and absorbed EVERY previous part's symbol instance too, nesting them one inside the next.
+  By the sixth part, there was one deeply-nested symbol (named after the last part) sitting on the first layer, and
+  five other layers were genuinely, completely empty - exactly what the user saw directly in Animate, and exactly
+  what element-count readback confirmed once asked (`LeftLeg: 1 element [Head]`, the other 5 layers: 0 elements
+  each). The visual export still looked perfect throughout, because nesting a symbol inside another preserves its
+  on-screen position - that's why this was invisible until someone looked at the actual timeline.
+- The real, confirmed fix: don't call `selectAll()` before converting. A freshly drawn shape is NOT auto-selected
+  (`doc.selection.length` is 0 immediately after `addNewOval`/`addNewRectangle`, confirmed) - select just it with
+  `doc.setSelectionRect({left,top,right,bottom}, true)` using its own bounding box, then fill/stroke/convert. With
+  both this fix and the `tl.currentLayer` fix applied together, element-count verification showed exactly 1 element
+  per layer, each matching its own name (`LeftLeg: 1 [LeftLeg]`, `Torso: 1 [Torso]`, etc.) - genuinely separate at
+  last. `scripts/character-skintone.mjs` now has the corrected version; `scripts/verify-elementcounts.mjs` is the
+  reusable ground-truth check to run on any future multi-part build before trusting it.
+- Lesson for next time: when building ANYTHING with more than one part/layer in one script, verify with element
+  counts (or an equivalent structural check), not just an exported image. A correct-looking render proves nothing
+  about internal structure once symbols and multiple layers are involved.
 
 **Not attempted yet (next steps, in priority order):**
 1. The `fl.tools` hang (above) - worth understanding before it's needed for something, rather than after.

@@ -28,10 +28,11 @@ const partScript = parts
     (p) => `
 log("layer: ${p.name}");
 var layer_${p.name} = tl.addNewLayer("${p.name}", "normal", false);
-tl.setSelectedLayers(layer_${p.name});
+tl.currentLayer = layer_${p.name};
 doc.selectNone();
 doc.${p.shape === "oval" ? "addNewOval" : "addNewRectangle"}({left:${p.box[0]}, top:${p.box[1]}, right:${p.box[2]}, bottom:${p.box[3]}}${p.shape === "oval" ? ", false" : ", 8"});
-doc.selectAll();
+doc.setSelectionRect({left:${p.box[0]}, top:${p.box[1]}, right:${p.box[2]}, bottom:${p.box[3]}}, true);
+log("  selection after setSelectionRect: " + doc.selection.length);
 doc.setCustomFill({style:"solid", color:"${p.fill}"});
 doc.setCustomStroke({style:"solid", thickness:${STROKE_W}, color:"${OUTLINE}"});
 doc.convertToSymbol("graphic", "${p.name}", "center");
@@ -54,7 +55,16 @@ tl.deleteLayer(0); // remove the default empty layer, only after the real ones e
 log("layers now: " + tl.layers.map(function(l){return l.name;}).join(", "));
 
 doc.exportPNG(OUTPUT_DIR + "/character.png", true, false);
-log("exported - Animate left open with this document for the next step");
+log("exported full character");
+
+// Proof each part is really on its own layer (layer.visible does not reliably affect exportPNG for symbol-instance
+// layers in this version, so element counts/names are the trustworthy check, not a visual hide/show export).
+for (var __p = 0; __p < tl.layers.length; __p++) {
+  var __el = tl.layers[__p].frames[0].elements;
+  var __names = [];
+  for (var __j = 0; __j < __el.length; __j++) { __names.push(__el[__j].libraryItem ? __el[__j].libraryItem.name : "?"); }
+  log("layer " + tl.layers[__p].name + ": " + __el.length + " element(s) [" + __names.join(", ") + "]");
+}
 `,
 });
 console.log(JSON.stringify(result, null, 2));

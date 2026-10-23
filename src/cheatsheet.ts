@@ -19,12 +19,29 @@ Proven JSFL patterns (live-verified, Adobe Animate 2024, Windows):
   exports the WHOLE TIMELINE as a numbered sequence (<basePath-without-.png>0001.png, 0002.png, ...), not just
   doc.currentFrame's single frame as the name might suggest. Use animate_assemble_video (ffmpeg) to turn that
   sequence into a real video file - this is the actual path to a finished clip, not exportVideo (below).
-- Layers for a multi-part character (confirmed working - a 6-layer figure with Head/Torso/LeftArm/RightArm/
-  LeftLeg/RightLeg, each its own layer AND its own symbol, drawn and exported correctly): tl.addNewLayer(name,
-  "normal", false) adds a layer and returns its index; tl.setSelectedLayers(index) makes it the one new shapes draw
-  onto. tl.deleteLayer(0) to remove the default "Layer_1" ONLY WORKS AFTER other layers exist - Animate refuses to
+- Layers for a multi-part character (confirmed working, with TWO real bugs found and fixed along the way - see
+  CLAUDE.md's dated entry for the full story; both are load-bearing, not optional cleanup):
+  1. tl.addNewLayer(name, "normal", false) adds a layer and returns its index. To actually target it for new
+     drawing, set tl.currentLayer = index DIRECTLY as a property assignment - tl.setSelectedLayers(index) reads
+     back as if it worked (tl.currentLayer matches) but does NOT reliably redirect where addNewOval/
+     addNewRectangle actually draw, at least once a symbol conversion has happened earlier in the script.
+  2. NEVER call doc.selectAll() before doc.convertToSymbol() when building multiple parts in one script -
+     selectAll() selects everything on the WHOLE STAGE (all layers, standard Animate behavior, same as Edit >
+     Select All in the GUI), not just the shape you just drew. Doing this in a loop silently nests every previous
+     part's symbol inside each new conversion - one deeply-nested symbol stack ending up on one layer, while the
+     exported image still looks completely correct (nesting preserves visual position), which is what made this
+     so easy to miss. Instead select ONLY the just-drawn shape: it is NOT auto-selected after addNewOval/
+     addNewRectangle (doc.selection.length is 0 right after drawing, confirmed), so call
+     doc.setSelectionRect({left,top,right,bottom}, true) with the shape's own bounding box immediately after
+     drawing it, before setCustomFill/setCustomStroke/convertToSymbol.
+  tl.deleteLayer(0) to remove the default "Layer_1" ONLY WORKS AFTER other layers exist - Animate refuses to
   delete the last remaining layer in a document, so call it AFTER adding the real layers, not before (confirmed:
   calling it on a document with only the default layer silently no-ops, no error, layer just stays).
+  VERIFYING layer separation: layer.visible = false/true round-trips correctly when read back, but does NOT
+  reliably affect doc.exportPNG()'s rendered output for layers holding symbol instances (confirmed: toggling
+  visibility and exporting produced either a blank image or the full composite, never the correctly isolated
+  single part). Don't trust a hide-and-export test for this. The reliable check is
+  tl.layers[i].frames[0].elements.length (and .elements[j].libraryItem.name) - confirmed accurate throughout.
 - Convert a shape to a symbol instance (needed before a classic motion tween): doc.selectAll(); then
   doc.convertToSymbol("graphic", "SomeName", "center") - confirmed working.
 - Classic motion tween (THE core animation primitive, confirmed working and visually verified - a ball smoothly

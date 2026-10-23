@@ -33,6 +33,16 @@ Proven JSFL patterns (live-verified, Adobe Animate 2024, Windows):
   (instance.x/y/scaleX/scaleY/rotation), then set tl.layers[i].frames[startFrameIndex].tweenType = "motion" on the
   FIRST frame of the span. Animate interpolates everything in between automatically - position AND scale both
   confirmed animating smoothly together.
+- Easing on a classic tween: tl.layers[i].frames[startFrame].tweenEasing = N, range -100..100. Negative = "ease in"
+  (slow start, accelerating - matches a falling object speeding up toward impact), positive = "ease out" (fast
+  start, decelerating - matches an object slowing as it reaches the top of an arc against gravity). Confirmed
+  working visually in a squash-and-stretch bounce demo (alternating +100 rising / -100 falling per bounce segment).
+- Squash and stretch (animation principle #1, verified working): set a symbol instance's scaleX/scaleY at a
+  keyframe just like x/y - e.g. scaleX=1.3, scaleY=0.65 at a "ground contact" keyframe for a squashed pose, back
+  to scaleX=1/scaleY=1 at the next keyframe for round/normal. Animate tweens scale smoothly along with position.
+  One gotcha: setting scale on frame 0 specifically (the very first frame, before any insertKeyframe calls) did
+  NOT visibly apply in testing, even though the same code worked for every other keyframe - if frame 0 needs a
+  non-default pose, re-verify it separately rather than assuming the general pattern covers it.
 - doc.exportVideo(...) EXISTS (doc.exportVideo = "function") but does NOT reliably produce a file in this setup -
   it appears to hand off asynchronously (likely to Adobe Media Encoder) and returns before anything is written, so
   killing Animate right after (which execJsfl always does) leaves no output. Use the exportPNG-sequence +

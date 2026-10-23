@@ -106,6 +106,18 @@ Worth recording in detail since it cost real time and very nearly looked like it
   real application crash within the same session it was tried. If this is revisited, it probably needs Animate's
   CEP/Toolbox persistent-extension architecture rather than more tuning of JSFL open/close timing.
 
+**Also verified live, working (2026-10-23, fourth pass - animation principles applied to the ping pong demo):**
+- `tweenEasing` (-100..100 on a classic tween's starting frame) confirmed working: positive for decelerating
+  motion (rising against gravity), negative for accelerating motion (falling) - visually verified on a 5s, 4-bounce
+  animation, motion reads as physically weighted rather than linear/robotic.
+- Squash and stretch confirmed working: scaleX/scaleY set per keyframe (squashed wide-and-short at ground contact,
+  normal round in the air) tweens smoothly along with position. One gotcha: setting scale specifically on frame 0
+  (before any insertKeyframe call) did not visibly apply, unlike every later keyframe set the same way - minor,
+  unresolved, worth another look if frame 0 ever needs a non-default pose.
+- These were applied directly from Disney's 12 animation principles (squash & stretch, ease in/out) at the user's
+  prompt - worth remembering that classic animation theory maps onto JSFL properties fairly directly and is a good
+  source of "what to build next" for anything that still looks robotic.
+
 **Not attempted yet (next steps, in priority order):**
 1. Fill/stroke color control - needed for anything beyond default-blue shapes.
 2. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
@@ -114,7 +126,9 @@ Worth recording in detail since it cost real time and very nearly looked like it
    as opposed to the whole-symbol position/scale tweening built so far. This is what "rigging" actually means and
    hasn't been touched yet; the multi-layer character above is the prep step for it, not the rigging itself.
 4. Shape tweens (morphing) as a second animation primitive, for effects a motion tween on a symbol can't do.
-5. Easing control on tweens (currently linear/default only).
+5. Other animation principles worth mapping onto JSFL as real needs come up: Arcs (the bounce demo already has
+   this via its keyframe path), Anticipation, Follow Through/Overlapping Action (would matter once there are
+   multi-part characters with independent timing per part), Secondary Action.
 6. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
    the real deliverable for this project's purposes).
 

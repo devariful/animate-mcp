@@ -6,10 +6,10 @@ Companion project to `flow-mcp` (Google Flow automation) - built separately beca
 it's unrelated in purpose: both exist to produce animated video, Flow via AI generation credits, this one via
 free local rendering once Adobe Animate is installed and licensed.
 
-- `src/animate.ts` the driver (find Animate, kill-then-launch pattern, JSFL exec wrapper, URI helpers)
+- `src/animate.ts` the driver (find Animate, no-kill continuity model, JSFL exec wrapper, URI helpers)
 - `src/assemble.ts` turns an exported PNG frame sequence into an MP4 via ffmpeg
 - `src/cheatsheet.ts` growing catalogue of live-verified JSFL API patterns, returned by `animate_status`
-- `src/index.ts` the three MCP tools (`animate_status`, `animate_exec`, `animate_assemble_video`)
+- `src/index.ts` the four MCP tools (`animate_status`, `animate_exec`, `animate_assemble_video`, `animate_reset`)
 
 ## Rules
 
@@ -131,8 +131,35 @@ sequence; the fix was to stop doing that entirely rather than to tune its timing
   prompt - worth remembering that classic animation theory maps onto JSFL properties fairly directly and is a good
   source of "what to build next" for anything that still looks robotic.
 
+**Fifth pass (2026-10-23, the user's own request: research character drawing, named layers, skin tone, outline
+strokes, learned together live): fill/stroke color control is SOLVED, with a real gotcha found along the way.**
+- `doc.setFillColor(color)`, called BEFORE drawing a shape to set the "next shape" default, is unreliable: on a
+  freshly reset Animate process it produced Animate's hardcoded default blue (`#0066CC`) instead of the requested
+  color, and after Animate had been kept open and reused across several calls (the continuity feature from the
+  previous pass) it got stuck returning a stale PREVIOUS color regardless of what was requested. This was the
+  direct cause of the earlier "fill color setting didn't work" item below - now actually understood, not just
+  observed.
+- The fix: `doc.setCustomFill({style:"solid", color:"#RRGGBB"})`, called on the shape's SELECTION AFTER drawing it,
+  is reliable - confirmed on a 6-part character where two different fills (a skin tone and a blue shirt) both
+  needed to apply correctly in the same script, which `setFillColor` could not do correctly but `setCustomFill`
+  did. `doc.setCustomStroke({style:"solid", thickness:N, color:"#RRGGBB"})` works the same reliable way for
+  outlines - full property readback matched exactly what was set.
+- A real character was built and visually verified with this: 6 named layers/symbols (Head, Torso, LeftArm,
+  RightArm, LeftLeg, RightLeg), skin-tone fill on the body parts, a different color on the torso (a shirt), and a
+  consistent dark brush-like outline stroke on every part - see `scripts/character-skintone.mjs`.
+- Separately, probing `fl.tools` (looking for brush-tool/preset selection, since the user asked about using a
+  specific "Brush Stroke 2" preset) caused `animate_exec` to hang indefinitely mid-script - not a stuck dialog,
+  Animate's own window stayed responsive throughout, but the script itself never reached its `log()` calls for
+  that section. Avoid touching `fl.tools` until this is understood; it was NOT needed for the actual goal (a
+  hand-drawn-looking outline), which the stroke-color approach above achieves without it. A true freeform/brush
+  PATH-drawing JSFL API (as opposed to geometric addNewOval/addNewRectangle shapes) was not found either - JSFL
+  does not appear to expose one at all; `doc.addNewPath`, `beginDraw`/`curveTo`/`endDraw`, and similar candidates
+  all came back `undefined`.
+- Also newly confirmed: JSFL has no native `JSON` object (`JSON.stringify` throws `ReferenceError`) - it's an old
+  engine. Don't reach for JSON in a JSFL body; build result strings manually if structure is needed in a log.
+
 **Not attempted yet (next steps, in priority order):**
-1. Fill/stroke color control - needed for anything beyond default-blue shapes.
+1. The `fl.tools` hang (above) - worth understanding before it's needed for something, rather than after.
 2. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
    primitive shapes drawn via JSFL - this is the real path to animating an actual character, not a ball.
 3. The Asset Warp Tool / bone-based rigging JSFL API - independent limb movement (an arm bending at the elbow),
@@ -145,7 +172,10 @@ sequence; the fix was to stop doing that entirely rather than to tune its timing
 6. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
    the real deliverable for this project's purposes).
 
-Smoke-tested end to end through the actual compiled MCP server (not ad hoc scripts) three times: `scripts/test.mjs`
-(shape + PNG export), `scripts/test-full-pipeline.mjs` (full exec -> exportPNG -> animate_assemble_video ->
-playable MP4, watched and confirmed correct), and `scripts/test-character-parts.mjs` (6-part character, separate
-named layers and symbols, visually verified).
+Smoke-tested end to end through the actual compiled MCP server (not ad hoc scripts) repeatedly, notably:
+`scripts/test.mjs` (shape + PNG export), `scripts/test-full-pipeline.mjs` (full exec -> exportPNG ->
+animate_assemble_video -> playable MP4, watched and confirmed correct), `scripts/test-continuity*.mjs` (7
+consecutive calls building one document), and `scripts/character-skintone.mjs` (the current 6-part character:
+named layers/symbols, correct per-part fill colors via setCustomFill, consistent outline stroke, visually
+verified) - this superseded an earlier version of the same idea that used the unreliable setFillColor and came out
+with every part the same color.

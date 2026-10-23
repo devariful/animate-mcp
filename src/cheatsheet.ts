@@ -37,6 +37,19 @@ Proven JSFL patterns (live-verified, Adobe Animate 2024, Windows):
   (slow start, accelerating - matches a falling object speeding up toward impact), positive = "ease out" (fast
   start, decelerating - matches an object slowing as it reaches the top of an arc against gravity). Confirmed
   working visually in a squash-and-stretch bounce demo (alternating +100 rising / -100 falling per bounce segment).
+- FILL COLOR: doc.setFillColor(color) (set BEFORE drawing, meant to set the "next shape" default) is UNRELIABLE -
+  confirmed broken on a fresh document/process (produced Animate's hardcoded default blue, #0066CC, instead of the
+  requested color), and separately confirmed to go stale/stuck on a cached previous value once Animate has been
+  kept open and reused across several animate_exec calls (the continuity feature itself seems to make this worse).
+  doc.setCustomFill({style:"solid", color:"#RRGGBB"}) applied to the SELECTED shape AFTER drawing it is the
+  reliable pattern - confirmed correct across a 6-part character with two different fill colors (skin tone vs a
+  blue shirt) after setFillColor had just given both parts the same wrong color. Always draw the shape with
+  doc.addNewOval/addNewRectangle first, select it, THEN set its real fill with setCustomFill - never trust
+  setFillColor's effect on what gets drawn next.
+- STROKE COLOR works the same way as fill: doc.setCustomStroke({style:"solid", thickness:N, color:"#RRGGBB"}) on a
+  selected shape is confirmed reliable (full property readback matched: style, thickness, color, capType, joinType
+  etc. all as set). doc.setStrokeColor(color) was not separately stress-tested but given the fill-color finding
+  above, treat it with the same suspicion and prefer setCustomStroke after drawing.
 - Squash and stretch (animation principle #1, verified working): set a symbol instance's scaleX/scaleY at a
   keyframe just like x/y - e.g. scaleX=1.3, scaleY=0.65 at a "ground contact" keyframe for a squashed pose, back
   to scaleX=1/scaleY=1 at the next keyframe for round/normal. Animate tweens scale smoothly along with position.

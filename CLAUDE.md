@@ -231,20 +231,32 @@ the established exportPNG+animate_assemble_video pipeline - the arm visibly rota
 swinging from its own center, confirming the pivot technique holds up in a full multi-part build, not just the
 isolated single-arm test.
 
+**Ninth pass (2026-10-23, same day: "learn rigging this easy character" - went back to finish what the seventh
+pass left open) - layer parenting and the Bone tool are now CONCLUDED, not just "not yet cracked".** Three more
+approaches tried: reversed layer stacking order, the reverse assignment direction (parentLayer as "I am the
+parent of X" rather than "my parent is X"), and `animationType` as a possible prerequisite flag - turned out to be
+read-only, a computed status (reflects the layer's current tween type), not a setting. Separately checked the Bone
+tool's JSFL surface directly (`doc.addNewBone`, `addBoneToSelection`, `addArmature`, `createArmature`) - all
+`undefined`. Seven failed approaches total across two sessions is enough to conclude, not just note as open:
+**neither layer parenting nor bone-based rigging has a working JSFL API in this Animate version.** This is now
+documented as settled in the cheatsheet and in the adobe-animate-rigging skill, not as a TODO - manual
+keyframing/tweening of each part (already proven in `project-wave-hello.mjs`) is the real, final answer for rigs
+built through this tool, not a stopgap.
+
 **Not attempted yet (next steps, in priority order):**
-1. Crack layer parenting (above) - the real payoff of a rig (pose the parent, children follow) is blocked on this.
+1. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
+   primitive shapes drawn via JSFL - this is the real path to animating an actual character, not a ball.
 2. `doc.distributeToLayers` - exists, not yet exercised live.
 3. The `fl.tools` hang (above) - worth understanding before it's needed for something, rather than after.
-4. Importing reference art (e.g. a character drawn in Flow/Nano Banana) as a symbol to animate, rather than only
-   primitive shapes drawn via JSFL - this is the real path to animating an actual character, not a ball.
-5. The Asset Warp Tool / bone-based rigging JSFL API - an alternative to layer parenting for independent limb
-   movement, if parenting stays uncracked. Not attempted yet.
-6. Shape tweens (morphing) as a second animation primitive, for effects a motion tween on a symbol can't do.
-7. Other animation principles worth mapping onto JSFL as real needs come up: Arcs (the bounce demo already has
+4. Shape tweens (morphing) as a second animation primitive, for effects a motion tween on a symbol can't do.
+5. Other animation principles worth mapping onto JSFL as real needs come up: Arcs (the bounce demo already has
    this via its keyframe path), Anticipation, Follow Through/Overlapping Action (would matter once there are
    multi-part characters with independent timing per part), Secondary Action.
-8. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
+6. Re-test `fl.saveDocumentAs` if an editable `.fla` deliverable is ever actually needed (it may not be - video is
    the real deliverable for this project's purposes).
+
+**Settled, not open any more:** automatic layer parenting and bone-based rigging - neither has a working JSFL API
+(see the ninth pass above). Don't re-attempt without a genuinely new lead.
 
 Smoke-tested end to end through the actual compiled MCP server (not ad hoc scripts) repeatedly, notably:
 `scripts/test.mjs` (shape + PNG export), `scripts/test-full-pipeline.mjs` (full exec -> exportPNG ->

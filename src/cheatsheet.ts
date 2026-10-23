@@ -75,15 +75,20 @@ Proven JSFL patterns (live-verified, Adobe Animate 2024, Windows):
   right", etc. - same grid as the Convert to Symbol dialog). For a horizontal arm whose shoulder is at its own
   left edge, convertToSymbol("graphic", "Arm", "center left") puts the pivot exactly there - confirmed with a real
   45-degree rotation: the shoulder end stayed fixed, the hand end swung naturally around it.
-- LAYER PARENTING (tried, NOT cracked - documented so it isn't re-attempted blind): layer.parentLayer is a real
-  property (shows up in a for...in enumeration) that DOES type-check - assigning a layer index (number) or name
-  (string) both throw "Invalid value for property parentLayer" immediately. Assigning an actual Layer object
-  reference does not throw but reads back as null right after - silently doesn't take. layerType also rejects
-  guessed parenting-related values ("armature", "parented") with "Invalid value for property layerType", only
-  standard types work. If revisited: check whether Animate's GUI "Enable Classic Layer Parenting" is a
-  document/Timeline-level flag that needs flipping first, since the per-layer property alone doesn't seem
-  sufficient. Until solved, pose rigs by directly keyframing/tweening each child's position+rotation to match its
-  parent's, rather than relying on automatic parenting.
+- LAYER PARENTING AND THE BONE TOOL: NEITHER IS SCRIPTABLE VIA JSFL (confirmed, not just unverified - seven
+  attempts total across two sessions, 2026-10-23). layer.parentLayer is a real, enumerable property that DOES
+  type-check (a layer index or name both throw "Invalid value for property parentLayer" immediately) but silently
+  refuses an actual Layer object reference too (no error, reads back null). Also tried and ruled out: reversed
+  layer order (parent above vs below the child), the reverse assignment direction (treating parentLayer as "I am
+  the parent of X"), and setting layerType/animationType to guessed values first ("armature", "parented", "motion"
+  - animationType turned out to be READ-ONLY, a computed status reflecting the current tween type, not something
+  you configure). The Bone/Asset Warp tool has no JSFL surface at all - doc.addNewBone, addBoneToSelection,
+  addArmature, createArmature are all \`undefined\`. CONCLUSION: automatic parent-child rigging is a GUI-only
+  feature in this Animate version. Pose a rig by directly keyframing/tweening each child's position+rotation to
+  match its parent's - this is not a workaround, it IS the real solution here, already proven in
+  scripts/project-wave-hello.mjs (a waving arm, manually keyframed, looks completely natural). Don't re-attempt
+  parentLayer or bone-tool JSFL calls without a genuinely new lead (e.g. a different JSFL version, a CEP/UXP panel
+  instead of pure JSFL, or Adobe documentation that specifically names a working method).
 - Squash and stretch (animation principle #1, verified working): set a symbol instance's scaleX/scaleY at a
   keyframe just like x/y - e.g. scaleX=1.3, scaleY=0.65 at a "ground contact" keyframe for a squashed pose, back
   to scaleX=1/scaleY=1 at the next keyframe for round/normal. Animate tweens scale smoothly along with position.
